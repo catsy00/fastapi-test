@@ -1,5 +1,5 @@
    
-FROM openshift/python:latest
+FROM registry.access.redhat.com/ubi8/python-38:latest
 
 COPY ./requirements.txt /app/requirements.txt
 
