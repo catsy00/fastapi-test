@@ -1,5 +1,5 @@
    
-FROM registry.access.redhat.com/ubi8/python-38:latest
+FROM registry.access.redhat.com/ubi8/python-312:1-1754554776
 
 COPY ./requirements.txt /app/requirements.txt
 
