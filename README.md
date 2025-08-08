@@ -18,6 +18,18 @@ Returns a JSON response with a "Hello World" message.
 }
 ```
 
+### `GET /test`
+
+Returns a JSON response with a "Happy test" message.
+
+**Example Response:**
+
+```json
+{
+  "message": "Happy test"
+}
+```
+
 ## How to Run
 
 This application is designed to be run as a Docker container.
