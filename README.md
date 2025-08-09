@@ -30,6 +30,47 @@ Returns a JSON response with a "Happy test" message.
 }
 ```
 
+### `GET /book/{book_name}`
+
+Retrieves information about a book from the MySQL database.
+
+*   **`book_name`** (path parameter): The name of the book to retrieve.
+
+**Example Success Response (200 OK):**
+
+```json
+{
+  "id": 1,
+  "name": "The Hitchhiker's Guide to the Galaxy",
+  "author": "Douglas Adams"
+}
+```
+
+**Example Error Response (404 Not Found):**
+
+```json
+{
+  "detail": "Book not found"
+}
+```
+
+**Example Error Response (500 Internal Server Error):**
+
+```json
+{
+  "detail": "Database connection failed"
+}
+```
+
+## Configuration
+
+The application requires the following environment variables to be set for database connection:
+
+*   `DB_HOST`: The hostname or IP address of the MySQL server.
+*   `DB_USER`: The username for the database connection.
+*   `DB_PASSWORD`: The password for the database user.
+*   `DB_NAME`: The name of the database to connect to.
+
 ## How to Run
 
 This application is designed to be run as a Docker container.
@@ -57,8 +98,15 @@ This application is designed to be run as a Docker container.
 
 3.  **Run the Docker container:**
 
+    You need to pass the database connection details as environment variables to the container.
+
     ```bash
-    docker run -p 8080:8080 fastapi-hello-world
+    docker run -p 8080:8080 \
+      -e DB_HOST=<your_db_host> \
+      -e DB_USER=<your_db_user> \
+      -e DB_PASSWORD=<your_db_password> \
+      -e DB_NAME=<your_db_name> \
+      fastapi-hello-world
     ```
 
 4.  **Access the application:**
