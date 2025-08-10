@@ -192,7 +192,14 @@ MySQL 데이터베이스에서 책 정보를 조회합니다.
        # OpenShift 레지스트리에 로그인 (필요 시) 및 이미지 푸시
        docker push $IMAGE_REGISTRY_PATH:latest
        ```
-       이 과정은 `DeploymentConfig`의 이미지 변경 트리거를 활성화하여 새 배포를 시작합니다.
+
+    e. **새 이미지로 업데이트 (롤아웃):**
+       표준 `Deployment` 리소스는 `ImageStream`의 태그 변경을 자동으로 감지하여 새 배포를 시작하지 않습니다. CI/CD 파이프라인이 Git의 `deployment.yaml` 파일에 있는 이미지 태그를 직접 업데이트하는 것이 일반적입니다.
+
+       수동으로 업데이트를 적용하려면, 새 이미지를 푸시한 후 다음 명령어로 롤아웃을 다시 시작하여 `latest` 태그의 새 이미지를 가져오도록 할 수 있습니다.
+       ```bash
+       oc rollout restart deployment/fastapi-hello-world -n your-app-namespace
+       ```
 
 5.  **Argo CD Application 적용:**
 

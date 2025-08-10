@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-hello-world
+  # namespace: <your-namespace> # Uncomment and replace <your-namespace>
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fastapi-hello-world
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: fastapi-hello-world
+    spec:
+      containers:
+        - name: fastapi-hello-world
+          # This image path points to the ImageStream in the same namespace.
+          # OpenShift's internal registry will resolve this.
+          # For this to work, the Service Account running the pod needs permissions to pull from the ImageStream.
+          # This is typically granted by default within the same namespace (project).
+          image: fastapi-hello-world:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: fastapi-app-secret
