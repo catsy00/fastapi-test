@@ -1,0 +1,14 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: fastapi-hello-world
+  # namespace: <your-namespace> # Uncomment and replace <your-namespace>
+spec:
+  to:
+    kind: Service
+    name: fastapi-hello-world
+  port:
+    targetPort: 8080-tcp
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

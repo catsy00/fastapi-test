@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fastapi-hello-world-app
+  # namespace: argocd # This should be the namespace where Argo CD is installed
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/your-username/your-repo.git' # Replace with your Git repository URL
+    path: deploy
+    targetRevision: HEAD
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: 'your-app-namespace' # Replace with the namespace where you want to deploy the app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

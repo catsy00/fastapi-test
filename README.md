@@ -120,3 +120,95 @@ MySQL 데이터베이스에서 책 정보를 조회합니다.
     ```json
     {"message":"Hello World"}
     ```
+
+---
+
+## OpenShift에 Argo CD로 배포하기
+
+이 애플리케이션은 OpenShift 클러스터에 Argo CD를 사용하여 배포할 수 있습니다. `deploy/` 디렉토리에 필요한 모든 설정 파일이 포함되어 있습니다.
+
+### 사전 요구 사항
+
+*   OpenShift 클러스터에 접근할 수 있는 `oc` CLI.
+*   클러스터에 Argo CD가 설치되어 있어야 합니다.
+*   애플리케이션을 배포할 네임스페이스(프로젝트).
+
+### 배포 단계
+
+1.  **설정 파일 수정:**
+
+    배포하기 전에 `deploy/` 디렉토리의 설정 파일에 있는 자리표시자(placeholder) 값들을 실제 환경에 맞게 수정해야 합니다.
+
+    *   `deploy/secret.yaml`: `stringData` 섹션에 실제 데이터베이스 연결 정보를 입력합니다.
+    *   `deploy/argocd-application.yaml`:
+        *   `repoURL`: 이 Git 리포지토리의 실제 URL로 변경합니다.
+        *   `namespace`: 애플리케이션을 배포할 OpenShift 네임스페이스로 변경합니다.
+    *   (선택 사항) 다른 `.yaml` 파일들에서 주석 처리된 `namespace` 필드를 활성화하고 당신의 네임스페이스를 지정할 수 있습니다.
+
+2.  **네임스페이스 생성:**
+
+    애플리케이션을 배포할 네임스페이스가 없다면 생성합니다.
+
+    ```bash
+    oc new-project your-app-namespace
+    ```
+
+3.  **Secret 적용:**
+
+    수정한 `secret.yaml` 파일을 OpenShift 클러스터에 적용하여 데이터베이스 접속 정보를 저장합니다.
+
+    ```bash
+    oc apply -f deploy/secret.yaml -n your-app-namespace
+    ```
+
+4.  **이미지 빌드 및 푸시 (OpenShift 내부 레지스트리 사용):**
+
+    OpenShift는 내부 컨테이너 이미지 레지스트리를 제공합니다. 로컬의 Docker 이미지를 OpenShift로 가져올 수 있습니다.
+
+    a. **OpenShift에 로그인하고 CLI 설정:**
+       OpenShift 웹 콘솔에서 로그인 토큰을 복사하여 CLI에 로그인합니다.
+
+    b. **로컬에서 Docker 이미지 빌드:**
+       (이미 빌드했다면 이 단계는 건너뛸 수 있습니다.)
+       ```bash
+       docker build -t fastapi-hello-world:latest .
+       ```
+
+    c. **ImageStream 생성:**
+       애플리케이션 이미지를 관리할 ImageStream을 생성합니다.
+       ```bash
+       oc apply -f deploy/imagestream.yaml -n your-app-namespace
+       ```
+
+    d. **이미지 푸시:**
+       로컬 Docker 이미지를 OpenShift의 ImageStream으로 푸시합니다. 이를 위해 먼저 레지스트리 경로를 확인하고 이미지를 태그한 후 푸시해야 합니다.
+       ```bash
+       # ImageStream 경로 확인
+       IMAGE_REGISTRY_PATH=$(oc get is fastapi-hello-world -n your-app-namespace -o 'jsonpath={.status.dockerImageRepository}')
+
+       # 로컬 이미지 태그
+       docker tag fastapi-hello-world:latest $IMAGE_REGISTRY_PATH:latest
+
+       # OpenShift 레지스트리에 로그인 (필요 시) 및 이미지 푸시
+       docker push $IMAGE_REGISTRY_PATH:latest
+       ```
+       이 과정은 `DeploymentConfig`의 이미지 변경 트리거를 활성화하여 새 배포를 시작합니다.
+
+5.  **Argo CD Application 적용:**
+
+    마지막으로, Argo CD가 애플리케이션을 관리하도록 `argocd-application.yaml` 파일을 적용합니다.
+
+    ```bash
+    # Argo CD가 설치된 네임스페이스에 적용해야 합니다.
+    oc apply -f deploy/argocd-application.yaml -n argocd
+    ```
+
+    이제 Argo CD UI에 접속하면 `fastapi-hello-world-app` 애플리케이션이 생성되고, Git 리포지토리의 `deploy` 디렉토리와 동기화되는 것을 볼 수 있습니다.
+
+6.  **배포 확인:**
+
+    `Route`를 통해 할당된 URL을 확인하고 애플리케이션에 접속합니다.
+
+    ```bash
+    oc get route fastapi-hello-world -n your-app-namespace
+    ```
