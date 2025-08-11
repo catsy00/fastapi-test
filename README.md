@@ -125,7 +125,7 @@ MySQL 데이터베이스에서 책 정보를 조회합니다.
 
 ## OpenShift에 Argo CD로 배포하기
 
-이 애플리케이션은 OpenShift 클러스터에 Argo CD와 Kustomize를 사용하여 배포할 수 있습니다. `deploy/` 디렉토리에 필요한 모든 설정 파일과 `kustomization.yaml` 파일이 포함되어 있습니다.
+이 애플리케이션은 OpenShift 클러스터에 Argo CD와 Kustomize를 사용하여 배포할 수 있습니다. `deploy/` 디렉토리에 필요한 모든 설정 파일과 `kustomization.yaml` 파일이 포함되어 있습니다. 안정적인 운영을 위해 `Deployment`에는 `startup`, `liveness`, `readiness` 헬스 체크 프로브가 설정되어 있습니다.
 
 ### 사전 요구 사항
 
