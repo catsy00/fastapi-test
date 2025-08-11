@@ -125,11 +125,12 @@ MySQL 데이터베이스에서 책 정보를 조회합니다.
 
 ## OpenShift에 Argo CD로 배포하기
 
-이 애플리케이션은 OpenShift 클러스터에 Argo CD를 사용하여 배포할 수 있습니다. `deploy/` 디렉토리에 필요한 모든 설정 파일이 포함되어 있습니다.
+이 애플리케이션은 OpenShift 클러스터에 Argo CD와 Kustomize를 사용하여 배포할 수 있습니다. `deploy/` 디렉토리에 필요한 모든 설정 파일과 `kustomization.yaml` 파일이 포함되어 있습니다.
 
 ### 사전 요구 사항
 
-*   OpenShift 클러스터에 접근할 수 있는 `oc` CLI.
+*   OpenShift 클러스터에 접근할 수 있는 `oc` CLI (v4.x 이상 권장).
+*   `kustomize` CLI (선택 사항, `oc`가 Kustomize 기능을 내장하고 있음).
 *   클러스터에 Argo CD가 설치되어 있어야 합니다.
 *   애플리케이션을 배포할 네임스페이스(프로젝트).
 
@@ -143,7 +144,6 @@ MySQL 데이터베이스에서 책 정보를 조회합니다.
     *   `deploy/argocd-application.yaml`:
         *   `repoURL`: 이 Git 리포지토리의 실제 URL로 변경합니다.
         *   `namespace`: 애플리케이션을 배포할 OpenShift 네임스페이스로 변경합니다.
-    *   (선택 사항) 다른 `.yaml` 파일들에서 주석 처리된 `namespace` 필드를 활성화하고 당신의 네임스페이스를 지정할 수 있습니다.
 
 2.  **네임스페이스 생성:**
 
@@ -153,57 +153,41 @@ MySQL 데이터베이스에서 책 정보를 조회합니다.
     oc new-project your-app-namespace
     ```
 
-3.  **Secret 적용:**
+3.  **Kustomize를 사용하여 리소스 적용 (수동 배포 시):**
 
-    수정한 `secret.yaml` 파일을 OpenShift 클러스터에 적용하여 데이터베이스 접속 정보를 저장합니다.
+    Argo CD를 사용하지 않고 수동으로 배포하거나 초기 설정을 테스트하려면, `oc apply -k` 명령어로 `deploy` 디렉토리의 모든 리소스를 한 번에 적용할 수 있습니다.
 
     ```bash
-    oc apply -f deploy/secret.yaml -n your-app-namespace
+    # `secret.yaml`의 내용을 먼저 수정한 후 실행하세요.
+    oc apply -k deploy/ -n your-app-namespace
+    ```
+    이 명령어는 `kustomization.yaml`에 정의된 모든 리소스(`Secret`, `ImageStream`, `Deployment`, `Service`, `Route`)를 클러스터에 적용합니다.
+
+4.  **이미지 빌드 및 푸시:**
+
+    이 과정은 이전과 동일합니다. 로컬에서 빌드한 이미지를 OpenShift의 `ImageStream`으로 푸시합니다.
+
+    ```bash
+    # 로컬 이미지 빌드
+    docker build -t fastapi-hello-world:latest .
+
+    # ImageStream 경로 확인 및 이미지 푸시
+    IMAGE_REGISTRY_PATH=$(oc get is fastapi-hello-world -n your-app-namespace -o 'jsonpath={.status.dockerImageRepository}')
+    docker tag fastapi-hello-world:latest $IMAGE_REGISTRY_PATH:latest
+    docker push $IMAGE_REGISTRY_PATH:latest
     ```
 
-4.  **이미지 빌드 및 푸시 (OpenShift 내부 레지스트리 사용):**
+5.  **새 이미지로 업데이트 (롤아웃):**
 
-    OpenShift는 내부 컨테이너 이미지 레지스트리를 제공합니다. 로컬의 Docker 이미지를 OpenShift로 가져올 수 있습니다.
+    새 이미지를 푸시한 후, 다음 명령어로 `Deployment`의 롤아웃을 다시 시작하여 업데이트를 적용합니다.
 
-    a. **OpenShift에 로그인하고 CLI 설정:**
-       OpenShift 웹 콘솔에서 로그인 토큰을 복사하여 CLI에 로그인합니다.
+    ```bash
+    oc rollout restart deployment/fastapi-hello-world -n your-app-namespace
+    ```
 
-    b. **로컬에서 Docker 이미지 빌드:**
-       (이미 빌드했다면 이 단계는 건너뛸 수 있습니다.)
-       ```bash
-       docker build -t fastapi-hello-world:latest .
-       ```
+6.  **Argo CD Application 적용:**
 
-    c. **ImageStream 생성:**
-       애플리케이션 이미지를 관리할 ImageStream을 생성합니다.
-       ```bash
-       oc apply -f deploy/imagestream.yaml -n your-app-namespace
-       ```
-
-    d. **이미지 푸시:**
-       로컬 Docker 이미지를 OpenShift의 ImageStream으로 푸시합니다. 이를 위해 먼저 레지스트리 경로를 확인하고 이미지를 태그한 후 푸시해야 합니다.
-       ```bash
-       # ImageStream 경로 확인
-       IMAGE_REGISTRY_PATH=$(oc get is fastapi-hello-world -n your-app-namespace -o 'jsonpath={.status.dockerImageRepository}')
-
-       # 로컬 이미지 태그
-       docker tag fastapi-hello-world:latest $IMAGE_REGISTRY_PATH:latest
-
-       # OpenShift 레지스트리에 로그인 (필요 시) 및 이미지 푸시
-       docker push $IMAGE_REGISTRY_PATH:latest
-       ```
-
-    e. **새 이미지로 업데이트 (롤아웃):**
-       표준 `Deployment` 리소스는 `ImageStream`의 태그 변경을 자동으로 감지하여 새 배포를 시작하지 않습니다. CI/CD 파이프라인이 Git의 `deployment.yaml` 파일에 있는 이미지 태그를 직접 업데이트하는 것이 일반적입니다.
-
-       수동으로 업데이트를 적용하려면, 새 이미지를 푸시한 후 다음 명령어로 롤아웃을 다시 시작하여 `latest` 태그의 새 이미지를 가져오도록 할 수 있습니다.
-       ```bash
-       oc rollout restart deployment/fastapi-hello-world -n your-app-namespace
-       ```
-
-5.  **Argo CD Application 적용:**
-
-    마지막으로, Argo CD가 애플리케이션을 관리하도록 `argocd-application.yaml` 파일을 적용합니다.
+    마지막으로, Argo CD가 애플리케이션을 관리하도록 `argocd-application.yaml` 파일을 적용합니다. `deploy` 디렉토리에 `kustomization.yaml` 파일이 있으므로 Argo CD는 자동으로 Kustomize를 사용하여 리소스를 배포합니다.
 
     ```bash
     # Argo CD가 설치된 네임스페이스에 적용해야 합니다.
@@ -212,7 +196,7 @@ MySQL 데이터베이스에서 책 정보를 조회합니다.
 
     이제 Argo CD UI에 접속하면 `fastapi-hello-world-app` 애플리케이션이 생성되고, Git 리포지토리의 `deploy` 디렉토리와 동기화되는 것을 볼 수 있습니다.
 
-6.  **배포 확인:**
+7.  **배포 확인:**
 
     `Route`를 통해 할당된 URL을 확인하고 애플리케이션에 접속합니다.
 
